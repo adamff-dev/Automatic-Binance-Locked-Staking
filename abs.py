@@ -4,27 +4,44 @@ import requests
 import time
 import ctypes
 from datetime import timedelta
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
-def start(driver, asset_name, asset_period):
+# Constants
+SEARCH_BAR_ID = "savings-search-coin"
+STAKE_BTN_ID = "pos-stake"
+MAX_BTN_CLASS = "css-joha13"
+ACCEPT_TERMS_XPATH = "//label[@class='css-bfef9a']"
+CONFIRM_BTN_ID = "pos-confirm"
+LOCK_AMO_CLASS = "css-16fg16t"
+AVAILABLE_AMO_CLASS = "css-87q6r1"
+ACCEPT_COOKIES_BTN_ID = "onetrust-accept-btn-handler"
+LABEL_HELPER_CLASS = "bn-input-helper-text"
+API_URL = "https://www.binance.com/gateway-api/v1/friendly/pos/union?pageSize=200&pageIndex=1&status=ALL"
+
+
+def startStaking(driver, assetName, assetPeriod):
     while True:
         driver.refresh()
 
         time.sleep(1.5)
 
-        search_bar = driver.find_element(By.ID, "savings-search-coin")
+        searchBar = driver.find_element(By.ID, SEARCH_BAR_ID)
 
-        search_bar.send_keys(asset_name)
+        searchBar.send_keys(assetName)  # write asset name on search bar
 
         time.sleep(2)
 
-        driver.find_element(By.XPATH, '//button[contains(text(), ' + str(asset_period) + ')]').click() # select period (days)
+        # select period (days)
+        driver.find_element(
+            By.XPATH, '//button[contains(text(), ' + str(assetPeriod) + ')]').click()
 
         time.sleep(0.1)
 
-        if driver.find_elements(By.CLASS_NAME, 'css-ercebf') == 0:
-            print("Asset sold out. Retrying...")
+        if driver.find_elements(By.ID, STAKE_BTN_ID) == 0:
+            writeToLog("Asset sold out. Retrying...",
+                       assetName, assetPeriod, True)
             continue
         else:
             print("Asset available")
@@ -35,25 +52,56 @@ def start(driver, asset_name, asset_period):
     try:
         time.sleep(0.3)
 
-        driver.find_element(By.ID, 'pos-stake').click() # open stake panel
+        driver.find_element(By.ID, STAKE_BTN_ID).click()  # open stake panel
 
         time.sleep(1)
 
-        driver.find_element(By.CLASS_NAME, 'css-lw7eev').click() # select max quantity
+        # select max quantity
+        driver.find_element(By.CLASS_NAME, MAX_BTN_CLASS).click()
 
         time.sleep(0.2)
 
-        driver.find_element(By.XPATH, "//label[@class='css-bfef9a']").click() # accept terms and conditions
-        
+        if len(driver.find_elements(By.CLASS_NAME, LABEL_HELPER_CLASS)) != 0:
+            writeToLog(driver.find_element(By.CLASS_NAME, LABEL_HELPER_CLASS).get_attribute(
+            "innerText"), assetName, assetPeriod)
+            return
+
+        lockAmount = driver.find_element(
+            By.CLASS_NAME, LOCK_AMO_CLASS).get_attribute("value")
+        availableAmount = driver.find_element(
+            By.CLASS_NAME, AVAILABLE_AMO_CLASS).get_attribute("innerText").split()[-2].rstrip("0")
+
+        if lockAmount != availableAmount:
+            writeToLog(
+                "Lock amount (" + lockAmount + ") and available amount (" + availableAmount + ") are not matching. Retrying...", assetName, assetPeriod)
+            startStaking(driver, assetName, assetPeriod)
+
+        # accept terms and conditions
+        driver.find_element(By.XPATH, ACCEPT_TERMS_XPATH).click()
+
         time.sleep(0.2)
 
-        driver.find_element(By.ID, 'pos-confirm').click() # confirm
+        driver.find_element(By.ID, CONFIRM_BTN_ID).click()  # confirm
 
-        print("Subscription completed successfully!")
+        writeToLog("Subscription completed successfully!",
+                   assetName, assetPeriod)
 
-    except:
-        print("Something went wrong. Retrying...")
-        start(driver, asset_name, asset_period)
+    except Exception as e:
+        print(e)
+        writeToLog("Something went wrong. Retrying...", assetName, assetPeriod)
+        startStaking(driver, assetName, assetPeriod)
+
+
+def writeToLog(text, assetName, assetPeriod):
+    now = datetime.now()
+    dateTime = now.strftime("%d/%m/%Y, %H:%M:%S")
+
+    print(text)
+
+    f = open("abs_log.txt", "a")
+    f.write(assetName + assetPeriod + "\t" + dateTime + "\t" + text + "\n")
+    f.close()
+
 
 def initWebDriver():
     print("--------------------------------------------")
@@ -74,20 +122,24 @@ def initWebDriver():
                     break
                 except:
                     print("Error: web driver not found.")
-                    print("Please, download the web driver and place it in the same forlder of this script")
-                    print("https://www.selenium.dev/documentation/webdriver/getting_started/install_drivers/")
+                    print(
+                        "Please, download the web driver and place it in the same forlder of this script")
+                    print(
+                        "https://www.selenium.dev/documentation/webdriver/getting_started/install_drivers/")
                     print("Press enter when you are done")
                     input(">")
 
-    while True:
-        try:
-            driver.get("https://accounts.binance.com/es/login")
-            break
-        except:
-            networkConnectionError()
-            continue
-
     driver.maximize_window()
+
+    return driver
+
+
+def openLoginAndPos(driver):
+    openWebsite(driver, "https://accounts.binance.com/es/login")
+
+    time.sleep(2)
+
+    driver.find_element(By.ID, ACCEPT_COOKIES_BTN_ID).click()  # Accept cookies
 
     print(" Please, log in to your Binance account")
     print("--------------------------------------------")
@@ -95,97 +147,139 @@ def initWebDriver():
     print("--------------------------------------------")
     input(">")
 
+    openWebsite(driver, "https://www.binance.com/es/pos")
+
+
+def openWebsite(driver, website):
     while True:
         try:
-            driver.get("https://www.binance.com/es/pos")
+            driver.get(website)
             break
         except:
-            networkConnectionError()
+            showNetworkError()
             continue
 
-    return driver
 
-def networkConnectionError():
+def showNetworkError():
     print("Error: we weren't able to open the website")
     print("Please, check your internet connection")
     print("Press enter to retry")
     input(">")
 
-def listener(asset_name, asset_period, check_every):
-    ctypes.windll.kernel32.SetConsoleTitleW("Searching for: " + asset_name + " " + asset_period + " days")
-    # baseline url request
-    friendly_url = "https://www.binance.com/gateway-api/v1/friendly/pos/"\
-                "union?pageSize=200&pageIndex=1&status=ALL"
-    
-    print("--------------------------------------------")
-    print(" Automatic Binance Locked staking" )
-    print("--------------------------------------------")
-    print(" Searching for...")
-    print(" Asset: " + asset_name)
-    print(" Period: " + asset_period + " days")
-    print("--------------------------------------------")
-    print(" Checking every " + str(check_every) + " seconds")
-    print("--------------------------------------------")
+
+def checkAssetAvailability(assetName, assetPeriod, checkInterval):
+    ctypes.windll.kernel32.SetConsoleTitleW(
+        "Searching for: " + assetName + " " + assetPeriod + " days")
+
+    showAssetInfo(assetName, assetPeriod, checkInterval)
 
     while True:
         # Request data from binance
-        response = json.loads(requests.get(friendly_url).text)["data"]
+        try:
+            response = json.loads(requests.get(API_URL).text)["data"]
+        except:
+            # Couldn't get json data. Sleep and retry
+            time.sleep(1000)
+            continue
 
         # Unpacking results
-        avaliables = []
-        for item in response:
-            for asset in item["projects"]:
-                if not asset["sellOut"]:
-                    # Asset available, adding a dictionary with asset name, duration and APY to the result list
-                    avaliables.append({
-                        "asset": asset["asset"],
-                        "duration": asset["duration"],
-                        "APY": str(round(float(asset["config"]["annualInterestRate"])*100, 2))
-                    })
+        avaliables = unpackResponse(response)
 
         for item in avaliables:
-            if asset_name == item["asset"] and asset_period == item["duration"]:
+            if assetName == item["asset"] and assetPeriod == item["duration"]:
                 print(" Asset found:")
-                print(f" {item['asset']} for {item['duration']}d / {item['APY']}% APY")
+                print(
+                    f" {item['asset']} for {item['duration']}d / {item['APY']}% APY")
                 print("--------------------------------------------")
-                return
+                return True
 
         # time loop waiting
-        time.sleep(timedelta(seconds=check_every).total_seconds())
+        time.sleep(timedelta(seconds=checkInterval).total_seconds())
+
+
+def unpackResponse(response):
+    avaliables = []
+
+    for item in response:
+        for asset in item["projects"]:
+            if not asset["sellOut"]:
+                # Asset available, adding a dictionary with asset name, duration and APY to the result list
+                avaliables.append({
+                    "asset": asset["asset"],
+                    "duration": asset["duration"],
+                    "APY": str(round(float(asset["config"]["annualInterestRate"]) * 100, 2))
+                })
+
+    return avaliables
+
+
+def showAssetInfo(assetName, assetPeriod, checkInterval):
+    print("--------------------------------------------")
+    print(" Automatic Binance Locked staking")
+    print("--------------------------------------------")
+    print(" Searching for...")
+    print(" Asset: " + assetName)
+    print(" Period: " + assetPeriod + " days")
+    print("--------------------------------------------")
+    print(" Checking every " + str(checkInterval) + " seconds")
+    print("--------------------------------------------")
+
 
 def end(shutdown):
     print("Bye!")
-    if shutdown == 'y':
+    if shutdown:
         os.system('shutdown -s -t 30')
     exit()
 
+
 def main():
-    ctypes.windll.kernel32.SetConsoleTitleW("Automatic Binance Locked staking")
+    ctypes.windll.kernel32.SetConsoleTitleW("Automatic Binance Locked Staking")
+
     try:
         print("--------------------------------------------")
-        print(" Automatic Binance Locked staking" )
+        print(" Automatic Binance Locked Staking")
         print("--------------------------------------------")
         print(" Please, type the target asset")
         print(" Examples: 'LUNA 90', 'AXS 60'...")
         print("--------------------------------------------")
-        target_asset = input(">")
-        print("--------------------------------------------")
-        print(" Please, enter check interval in seconds")
-        print("--------------------------------------------")
-        check_every = int(input(">"))
+
+        while True:
+            target_asset = input(">")
+            assetName, assetPeriod = target_asset.split(" ")
+
+            if assetPeriod in ["15", "30", "60", "90", "120"]:
+                break
+            else:
+                print("Wrong duration")
+
+        while True:
+            print("--------------------------------------------")
+            print(" Please, enter check interval in seconds")
+            print("--------------------------------------------")
+            checkInterval = int(input(">"))
+            if checkInterval >= 0:
+                break
+            else:
+                print("Wrong check interval")
+
         print("--------------------------------------------")
         print(" Do you want to shutdown your computer")
         print(" after subscripion? (y/n)")
         print("--------------------------------------------")
-        shutdown = input(">")
-        
-        asset_name, asset_period = target_asset.split(" ")
+        shutdown = True if input(">").lower == 'y' else False
+
         driver = initWebDriver()
-        listener(asset_name, asset_period, check_every)
-        start(driver, asset_name, asset_period)
+
+        openLoginAndPos(driver)
+
+        if checkAssetAvailability(assetName, assetPeriod, checkInterval):
+            startStaking(driver, assetName, assetPeriod)
+
         end(shutdown)
+
     except:
         exit()
+
 
 if __name__ == "__main__":
     main()
