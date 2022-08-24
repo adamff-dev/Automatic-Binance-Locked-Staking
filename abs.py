@@ -12,6 +12,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# Globals
 global driver
 global assetName
 global assetPeriod
@@ -27,8 +28,8 @@ MAX_BTN_CLASS = "css-joha13"
 AUTO_STAKE_SWITCH_CLASS = "css-1bbf0ma"
 ACCEPT_TERMS_XPATH = "//div[4]/div/div[4]/label/div"
 MODAL_TITLE_CLASS = "modal-title"
-CHECKBOXES_AUTOSTAKE_CLASS = "css-pf8gn9"
-ACCEPT_AUTOSTAKE_BTN_CLASS = "css-d1jly6"
+CHECKBOXES_autoStaking_CLASS = "css-pf8gn9"
+ACCEPT_autoStaking_BTN_CLASS = "css-d1jly6"
 CONFIRM_BTN_ID = "pos-confirm"
 LOCK_AMO_CLASS = "css-16fg16t"
 AVAILABLE_AMO_CLASS = "css-87q6r1"
@@ -64,6 +65,7 @@ def searchAsset():
 
         searchBar.send_keys(assetName)  # write asset name on search bar
 
+        # wait for the asset to show up
         while len(driver.find_elements(By.CLASS_NAME, ASSET_TITLE_CLASS)) != 1:
             time.sleep(0.2)
             len(driver.find_elements(By.CLASS_NAME, ASSET_TITLE_CLASS))
@@ -83,6 +85,8 @@ def searchAsset():
 
 
 def compareLockAndAvailableAmount():
+    """Checks if lock amount equals available amount"""
+
     lockAmount = driver.find_element(
         By.CLASS_NAME, LOCK_AMO_CLASS).get_attribute("value")
     availableAmount = driver.find_element(
@@ -96,16 +100,18 @@ def compareLockAndAvailableAmount():
     return True
 
 
-def autoStakeAcceptTerms():
+def autoStakingAcceptTerms():
+    """Accepts terms of auto stake and accepts subscription"""
+
     waitForElement(driver.find_element(By.CLASS_NAME, MODAL_TITLE_CLASS))
     checkboxes = driver.find_elements(
-        By.CLASS_NAME, CHECKBOXES_AUTOSTAKE_CLASS)
+        By.CLASS_NAME, CHECKBOXES_autoStaking_CLASS)
     for checkbox in checkboxes:
         checkbox.click()
-    driver.find_element(By.CLASS_NAME, ACCEPT_AUTOSTAKE_BTN_CLASS).click()
+    driver.find_element(By.CLASS_NAME, ACCEPT_autoStaking_BTN_CLASS).click()
 
 
-def startStaking(autoStake):
+def startStaking(autoStaking):
     while True:
         searchAsset()
         print("  Starting subscription...")
@@ -121,6 +127,7 @@ def startStaking(autoStake):
 
             time.sleep(0.2)
 
+            # if there's an error, in helper labal, write it to the log
             if len(driver.find_elements(By.CLASS_NAME, LABEL_HELPER_CLASS)) != 0:
                 writeToLog(driver.find_element(By.CLASS_NAME, LABEL_HELPER_CLASS).get_attribute(
                     "innerText"))
@@ -129,7 +136,7 @@ def startStaking(autoStake):
             if not compareLockAndAvailableAmount():
                 continue
 
-            if not autoStake:
+            if not autoStaking:
                 scrollAndClick(driver.find_element(
                     By.CLASS_NAME, AUTO_STAKE_SWITCH_CLASS))
 
@@ -140,17 +147,19 @@ def startStaking(autoStake):
 
             driver.find_element(By.ID, CONFIRM_BTN_ID).click()  # confirm
 
-            if autoStake:
-                autoStakeAcceptTerms()
+            if autoStaking:
+                autoStakingAcceptTerms()
 
             writeToLog("Subscription completed successfully!")
 
         except Exception as e:
-            print(e)
-            writeToLog("Something went wrong. Retrying...")
+            writeToLog("Something went wrong. \nException: " + e)
+            print("  Retrying...")
 
 
 def writeToLog(text):
+    """Writes a text to the log and prints that text"""
+
     now = datetime.now()
     dateTime = now.strftime("%d/%m/%Y, %H:%M:%S")
 
@@ -184,9 +193,7 @@ def initWebDriver():
   Please, download the web driver
   https://www.selenium.dev/documentation/webdriver/getting_started/install_drivers/
   Press enter when you are done
-  >
-'''
-                          )
+  >''')
 
     driver.maximize_window()
 
@@ -194,13 +201,12 @@ def initWebDriver():
 
 
 def openLoginAndPos():
+    """Opens the login page and redirects to POS page after user logs-in"""
+
     openWebsite(LOGIN_URL)
-
     waitAndClick(driver.find_element(By.ID, ACCEPT_COOKIES_BTN_ID))
-
     while driver.current_url != POST_LOGIN_URL:
         time.sleep(0.2)
-
     openWebsite(POS_URL)
 
 
@@ -249,6 +255,8 @@ def checkAssetAvailability(checkingInterval):
 
 
 def unpackResponse(response):
+    """Unpacks API response"""
+
     avaliableAssets = []
 
     for item in response:
@@ -264,23 +272,25 @@ def unpackResponse(response):
     return avaliableAssets
 
 
-def showAssetInfo(checkingInterval, autoStake, shutdown):
+def showSessionInfo(checkingInterval, autoStaking, shutdown):
     print("""
  --------------------------------------------
-       Automatic Binance Locked staking
+       Automatic Binance Locked Staking
  --------------------------------------------
   Searching for...
   Asset: %s
   Period: %s days
  --------------------------------------------
   Checking every %s seconds
-  Auto-stake: %s
+  auto staking: %s
   Shutdown after subscription: %s
  --------------------------------------------
-""" % (assetName, assetPeriod, str(checkingInterval), "yes" if autoStake else "no", "yes" if shutdown else "no"))
+""" % (assetName, assetPeriod, str(checkingInterval), "yes" if autoStaking else "no", "yes" if shutdown else "no"))
 
 
 def end(shutdown):
+    """Shutdowns the computer if specified"""
+
     print("Bye!")
     osName = platform.system()
 
@@ -300,60 +310,60 @@ def main():
     global assetName
     global assetPeriod
 
-    try:
-        print(" --------------------------------------------")
-        print("       Automatic Binance Locked Staking")
-        print(" --------------------------------------------")
-        print("  Please, type the target asset")
-        print("  Examples: 'ADA 120', 'DOT 30'...")
-        print(" --------------------------------------------")
+    print("""
+ --------------------------------------------
+       Automatic Binance Locked Staking
+ --------------------------------------------
+  Please, type the asset and period you
+  want to subscribe.
 
-        while True:
-            targetAsset = input("  >")
+  Examples: 'ADA 120', 'DOT 30'…
+ --------------------------------------------""")
 
-            if re.search(REGEX_ASSET, targetAsset):
-                assetName, assetPeriod = targetAsset.split(" ")
+    while True:
+        assetNamePeriod = input("  >")
+
+        if re.search(REGEX_ASSET, assetNamePeriod):
+            assetName, assetPeriod = assetNamePeriod.split(" ")
+            break
+        else:
+            print("\n  Wrong asset-period format")
+            print("  Check the examples and try again\n")
+
+    while True:
+        print(" --------------------------------------------")
+        print("  Type checking interval (in seconds)")
+        print(" --------------------------------------------")
+        checkingInterval = input("  >")
+
+        if checkingInterval.isnumeric():
+            checkingInterval = int(checkingInterval)
+            if checkingInterval >= 0:
                 break
-            else:
-                print("  Wrong asset pattern. Try again.")
+        else:
+            print("\n  Wrong checking interval\n")
 
-        while True:
-            print(" --------------------------------------------")
-            print("  Enter checking interval in seconds")
-            print(" --------------------------------------------")
-            checkingInterval = input("  >")
+    print(" --------------------------------------------")
+    print("  Do you want to enable Auto-Staking? (y/n)")
+    print(" --------------------------------------------")
+    autoStaking = True if input("  >").lower() == 'y' else False
 
-            if checkingInterval.isnumeric():
-                checkingInterval = int(checkingInterval)
-                if checkingInterval >= 0:
-                    break
-            else:
-                print("  Wrong checking interval")
+    print(" --------------------------------------------")
+    print("  Do you want to shutdown your computer")
+    print("  after subscripion? (y/n)")
+    print(" --------------------------------------------")
+    shutdown = True if input("  >").lower() == 'y' else False
 
-        print(" --------------------------------------------")
-        print("  Do you want to enable auto-stake? (y/n)")
-        print(" --------------------------------------------")
-        autoStake = True if input("  >").lower() == 'y' else False
+    driver = initWebDriver()
 
-        print(" --------------------------------------------")
-        print("  Do you want to shutdown your computer")
-        print("  after subscripion? (y/n)")
-        print(" --------------------------------------------")
-        shutdown = True if input("  >").lower() == 'y' else False
+    openLoginAndPos()
+    
+    showSessionInfo(checkingInterval, autoStaking, shutdown)
 
-        driver = initWebDriver()
+    if checkAssetAvailability(checkingInterval):
+        startStaking(autoStaking)
 
-        showAssetInfo(checkingInterval, autoStake, shutdown)
-
-        openLoginAndPos()
-
-        if checkAssetAvailability(checkingInterval):
-            startStaking(autoStake)
-
-        end(shutdown)
-
-    except:
-        exit()
+    end(shutdown)
 
 
 if __name__ == "__main__":
