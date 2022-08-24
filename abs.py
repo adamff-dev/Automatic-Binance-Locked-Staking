@@ -234,9 +234,9 @@ def checkAssetAvailability(checkingInterval):
             continue
 
         # Unpacking results
-        avaliables = unpackResponse(response)
+        avaliableAssets = unpackResponse(response)
 
-        for item in avaliables:
+        for item in avaliableAssets:
             if assetName == item["asset"] and assetPeriod == item["duration"]:
                 print(" Asset found:")
                 print(
@@ -249,19 +249,19 @@ def checkAssetAvailability(checkingInterval):
 
 
 def unpackResponse(response):
-    avaliables = []
+    avaliableAssets = []
 
     for item in response:
         for asset in item["projects"]:
             if not asset["sellOut"]:
                 # Asset available, adding a dictionary with asset name, duration and APY to the result list
-                avaliables.append({
+                avaliableAssets.append({
                     "asset": asset["asset"],
                     "duration": asset["duration"],
                     "APY": str(round(float(asset["config"]["annualInterestRate"]) * 100, 2))
                 })
 
-    return avaliables
+    return avaliableAssets
 
 
 def showAssetInfo(checkingInterval, autoStake, shutdown):
@@ -277,8 +277,7 @@ def showAssetInfo(checkingInterval, autoStake, shutdown):
   Auto-stake: %s
   Shutdown after subscription: %s
  --------------------------------------------
-""" % (assetName, assetPeriod, str(checkingInterval), "yes" if autoStake else "no", "yes" if shutdown else "no")
-    )
+""" % (assetName, assetPeriod, str(checkingInterval), "yes" if autoStake else "no", "yes" if shutdown else "no"))
 
 
 def end(shutdown):
