@@ -309,7 +309,7 @@ def main():
         print(" --------------------------------------------")
 
         while True:
-            targetAsset = input(" >")
+            targetAsset = input("  >")
 
             if re.search(REGEX_ASSET, targetAsset):
                 assetName, assetPeriod = targetAsset.split(" ")
