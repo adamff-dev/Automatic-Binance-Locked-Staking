@@ -1,6 +1,4 @@
-from glob import glob
 import os
-from pickle import FALSE
 import platform
 import json
 import requests
@@ -29,8 +27,8 @@ MAX_BTN_CLASS = "css-joha13"
 AUTO_STAKE_SWITCH_CLASS = "css-1bbf0ma"
 ACCEPT_TERMS_XPATH = "//div[4]/div/div[4]/label/div"
 MODAL_TITLE_CLASS = "modal-title"
-ACCEPT_TERMS_AUTOSTAKE_CLASS = "css-pf8gn9"
-ACCEPT_AUTOSTAKE_CLASS = "css-d1jly6"
+CHECKBOXES_AUTOSTAKE_CLASS = "css-pf8gn9"
+ACCEPT_AUTOSTAKE_BTN_CLASS = "css-d1jly6"
 CONFIRM_BTN_ID = "pos-confirm"
 LOCK_AMO_CLASS = "css-16fg16t"
 AVAILABLE_AMO_CLASS = "css-87q6r1"
@@ -101,10 +99,10 @@ def compareLockAndAvailableAmount():
 def autoStakeAcceptTerms():
     waitForElement(driver.find_element(By.CLASS_NAME, MODAL_TITLE_CLASS))
     checkboxes = driver.find_elements(
-        By.CLASS_NAME, ACCEPT_TERMS_AUTOSTAKE_CLASS)
+        By.CLASS_NAME, CHECKBOXES_AUTOSTAKE_CLASS)
     for checkbox in checkboxes:
         checkbox.click()
-    driver.find_element(By.CLASS_NAME, ACCEPT_AUTOSTAKE_CLASS).click()
+    driver.find_element(By.CLASS_NAME, ACCEPT_AUTOSTAKE_BTN_CLASS).click()
 
 
 def startStaking(autoStake):
@@ -140,16 +138,16 @@ def startStaking(autoStake):
 
             time.sleep(0.2)
 
-            # driver.find_element(By.ID, CONFIRM_BTN_ID).click()  # confirm
+            driver.find_element(By.ID, CONFIRM_BTN_ID).click()  # confirm
 
             if autoStake:
                 autoStakeAcceptTerms()
 
-            writeToLog("  Subscription completed successfully!")
+            writeToLog("Subscription completed successfully!")
 
         except Exception as e:
             print(e)
-            writeToLog("  Something went wrong. Retrying...")
+            writeToLog("Something went wrong. Retrying...")
 
 
 def writeToLog(text):
@@ -188,7 +186,7 @@ def initWebDriver():
   Press enter when you are done
   >
 '''
-                    )
+                          )
 
     driver.maximize_window()
 
@@ -309,7 +307,7 @@ def main():
         print("       Automatic Binance Locked Staking")
         print(" --------------------------------------------")
         print("  Please, type the target asset")
-        print("  Examples: 'LUNA 90', 'AXS 60'...")
+        print("  Examples: 'ADA 120', 'DOT 30'...")
         print(" --------------------------------------------")
 
         while True:
