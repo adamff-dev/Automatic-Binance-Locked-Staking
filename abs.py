@@ -220,8 +220,7 @@ def showNetworkError():
   Please, check your internet connectio and
   press enter to retry
   >
-'''
-          )
+''')
 
 
 def checkAssetAvailability(checkingInterval):
