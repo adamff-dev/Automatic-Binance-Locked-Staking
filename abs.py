@@ -1,7 +1,6 @@
 import os
 import platform
 import json
-from typing import final
 import requests
 import time
 import re
