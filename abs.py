@@ -1,6 +1,8 @@
+from lib2to3.pgen2.driver import Driver
 import os
 import platform
 import json
+from typing import final
 import requests
 import time
 import re
@@ -11,6 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchWindowException
 
 # Globals
 global driver
@@ -47,14 +50,15 @@ def scrollAndClick(element):
     element.click()
 
 
-def waitForElement(element):
-    WebDriverWait(driver, 20).until(
-        EC.element_to_be_clickable(element))
+def waitForElement(strategy, locator, timeout):
+    if timeout == None:
+        timeout = 20
+    return WebDriverWait(driver, timeout).until(
+        EC.element_to_be_clickable((strategy, locator)))
 
 
-def waitAndClick(element):
-    waitForElement(element)
-    element.click()
+def waitAndClick(strategy, locator, timeout):
+    waitForElement(strategy, locator, timeout).click()
 
 
 def searchAsset():
@@ -77,7 +81,7 @@ def searchAsset():
         time.sleep(0.1)
 
         if driver.find_elements(By.ID, STAKE_BTN_ID) == 0:
-            writeToLog("Asset sold out. Retrying...")
+            writeToLog("Asset sold out. Retrying…")
             continue
         else:
             print("  Asset available")
@@ -94,7 +98,7 @@ def compareLockAndAvailableAmount():
 
     if lockAmount != availableAmount:
         writeToLog(
-            "Lock amount (" + lockAmount + ") and available amount (" + availableAmount + ") are not matching. Retrying...")
+            "Lock amount (" + lockAmount + ") and available amount (" + availableAmount + ") are not matching. Retrying…")
         return False
 
     return True
@@ -103,18 +107,24 @@ def compareLockAndAvailableAmount():
 def autoStakingAcceptTerms():
     """Accepts terms of auto stake and accepts subscription"""
 
-    waitForElement(driver.find_element(By.CLASS_NAME, MODAL_TITLE_CLASS))
+    waitForElement(By.CLASS_NAME, MODAL_TITLE_CLASS, None)
     checkboxes = driver.find_elements(
         By.CLASS_NAME, CHECKBOXES_autoStaking_CLASS)
     for checkbox in checkboxes:
         checkbox.click()
     driver.find_element(By.CLASS_NAME, ACCEPT_autoStaking_BTN_CLASS).click()
 
+def acceptCookies():
+    try:
+        waitAndClick(By.ID, ACCEPT_COOKIES_BTN_ID, 15)
+        return True
+    except:
+        return False
 
 def startStaking(autoStaking):
     while True:
         searchAsset()
-        print("  Starting subscription...")
+        print("  Starting subscription…")
 
         try:
             time.sleep(0.3)
@@ -123,7 +133,7 @@ def startStaking(autoStaking):
             driver.find_element(By.ID, STAKE_BTN_ID).click()
 
             # select max quantity
-            waitAndClick(driver.find_element(By.CLASS_NAME, MAX_BTN_CLASS))
+            waitAndClick(By.CLASS_NAME, MAX_BTN_CLASS)
 
             time.sleep(0.2)
 
@@ -145,7 +155,7 @@ def startStaking(autoStaking):
 
             time.sleep(0.2)
 
-            driver.find_element(By.ID, CONFIRM_BTN_ID).click()  # confirm
+            # driver.find_element(By.ID, CONFIRM_BTN_ID).click()  # confirm
 
             if autoStaking:
                 autoStakingAcceptTerms()
@@ -155,26 +165,26 @@ def startStaking(autoStaking):
             break
 
         except Exception as e:
-            writeToLog("Something went wrong. \nException: " + e)
-            print("  Retrying...")
+            writeToLog("Something went wrong.\nException:\n" + e)
+            print("  Retrying…")
 
 
-def writeToLog(text):
-    """Writes a text to the log and prints that text"""
+def writeToLog(message):
+    """Writes a message to the log and prints it"""
 
     now = datetime.now()
     dateTime = now.strftime("%d/%m/%Y, %H:%M:%S")
 
-    print("  " + text)
+    print("  " + message)
 
     f = open("abs_log.txt", "a")
-    f.write(assetName + assetPeriod + "\t" + dateTime + "\t" + text + "\n")
+    f.write(f"{assetName} {assetPeriod} days\t{dateTime}\t{message}\n")
     f.close()
 
 
 def initWebDriver():
     print(" --------------------------------------------")
-    print("  Starting web driver...")
+    print("  Starting web driver…")
     print(" --------------------------------------------")
 
     while True:
@@ -206,10 +216,21 @@ def openLoginAndPos():
     """Opens the login page and redirects to POS page after user logs-in"""
 
     openWebsite(LOGIN_URL)
-    waitAndClick(driver.find_element(By.ID, ACCEPT_COOKIES_BTN_ID))
+
+    print('''
+ --------------------------------------------
+  Please, log into your Binance account
+ --------------------------------------------''')
+    
+    cookiesAccepted = acceptCookies()
+
     while driver.current_url != POST_LOGIN_URL:
         time.sleep(0.2)
+
     openWebsite(POS_URL)
+    
+    if not cookiesAccepted:
+        acceptCookies()
 
 
 def openWebsite(website):
@@ -225,13 +246,12 @@ def openWebsite(website):
 def showNetworkError():
     input('''
   Error: we weren't able to open the website
-  Please, check your internet connectio and
+  Please, check your internet connection and
   press enter to retry
-  >
-''')
+  >''')
 
 
-def checkAssetAvailability(checkingInterval):
+def getAssetAvailability(checkingInterval):
     while True:
         # Request data from binance
         try:
@@ -248,7 +268,7 @@ def checkAssetAvailability(checkingInterval):
             if assetName == item["asset"] and assetPeriod == item["duration"]:
                 print(" Asset found:")
                 print(
-                    f" {item['asset']} for {item['duration']}d / {item['APY']}% APY")
+                    f" {item['asset']} for {item['duration']} days / {item['APY']}% APY")
                 print("--------------------------------------------")
                 return True
 
@@ -274,25 +294,34 @@ def unpackResponse(response):
     return avaliableAssets
 
 
+def getYesNo(condition):
+    return "yes" if condition else "no"
+
+
 def showSessionInfo(checkingInterval, autoStaking, shutdown):
     print("""
  --------------------------------------------
        Automatic Binance Locked Staking
  --------------------------------------------
-  Searching for...
+  Searching for…
   Asset: %s
   Period: %s days
  --------------------------------------------
   Checking every %s seconds
-  auto staking: %s
+  Auto-Staking: %s
   Shutdown after subscription: %s
  --------------------------------------------
-""" % (assetName, assetPeriod, str(checkingInterval), "yes" if autoStaking else "no", "yes" if shutdown else "no"))
+""" % (assetName,
+        assetPeriod,
+        str(checkingInterval),
+        getYesNo(autoStaking),
+        getYesNo(shutdown)))
 
 
 def end(shutdown):
     """Shutdowns the computer if specified"""
 
+    driver.close()
     print("Bye!")
     osName = platform.system()
 
@@ -327,6 +356,7 @@ def main():
 
         if re.search(REGEX_ASSET, assetNamePeriod):
             assetName, assetPeriod = assetNamePeriod.split(" ")
+            assetName = assetName.upper()
             break
         else:
             print("\n  Wrong asset-period format")
@@ -359,14 +389,19 @@ def main():
     driver = initWebDriver()
 
     openLoginAndPos()
-    
+
     showSessionInfo(checkingInterval, autoStaking, shutdown)
 
-    if checkAssetAvailability(checkingInterval):
+    if getAssetAvailability(checkingInterval):
         startStaking(autoStaking)
 
     end(shutdown)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except NoSuchWindowException:
+        print("  Error: web driver was closed!")
+    finally:
+        exit()
