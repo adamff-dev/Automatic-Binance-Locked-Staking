@@ -152,6 +152,8 @@ def startStaking(autoStaking):
 
             writeToLog("Subscription completed successfully!")
 
+            break
+
         except Exception as e:
             writeToLog("Something went wrong. \nException: " + e)
             print("  Retrying...")
