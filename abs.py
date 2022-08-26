@@ -117,6 +117,7 @@ def acceptCookies():
         waitAndClick(By.ID, ACCEPT_COOKIES_BTN_ID, 15)
         return True
     except:
+        print("Not found")
         return False
 
 def startStaking(autoStaking):
@@ -131,7 +132,7 @@ def startStaking(autoStaking):
             driver.find_element(By.ID, STAKE_BTN_ID).click()
 
             # select max quantity
-            waitAndClick(By.CLASS_NAME, MAX_BTN_CLASS)
+            waitAndClick(By.CLASS_NAME, MAX_BTN_CLASS, 5)
 
             time.sleep(0.2)
 
@@ -264,14 +265,15 @@ def getAssetAvailability(checkingInterval):
 
         for item in avaliableAssets:
             if assetName == item["asset"] and assetPeriod == item["duration"]:
-                print(" Asset found:")
+                print(" --------------------------------------------")
+                print("  Asset found:")
                 print(
-                    f" {item['asset']} for {item['duration']} days / {item['APY']}% APY")
-                print("--------------------------------------------")
+                    f"  {item['asset']} for {item['duration']} days / {item['APY']}% APY")
+                print(" --------------------------------------------")
                 return True
 
         # time loop waiting
-        time.sleep(timedelta(seconds=checkingInterval).total_seconds())
+        time.sleep(timedelta(seconds = checkingInterval).total_seconds())
 
 
 def unpackResponse(response):
