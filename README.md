@@ -1,5 +1,7 @@
 # Automatic Binance Locked Staking
 
+(Deprecated: elements selectors or process may be outdated)
+
 This is a small python script to automate Binance locked staking.
 
 ## Demo
